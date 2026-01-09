@@ -193,12 +193,12 @@ def preprocess_light(text):
 # =====================================================================
 MODEL_PATHS = {
     "IndoBERT": {
-        "Normal": ("models/indobert_normal", preprocess_normal),
-        "Light": ("models/indobert_light", preprocess_light),
+        "Normal": ("winsonn13/indobert-normal", preprocess_normal),
+        "Light": ("winsonn13/indobert-light", preprocess_light),
     },
     "XLM-RoBERTa": {
-        "Normal": ("models/xlmroberta_normal", preprocess_normal),
-        "Light": ("models/xlmroberta_light", preprocess_light),
+        "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
+        "Light": ("winsonn13/xlmroberta-light", preprocess_light),
     },
 }
 
