@@ -1,0 +1,6 @@
+streamlit_app/models/
+*.bin
+*.pt
+*.safetensors
+__pycache__/
+.ipynb_checkpoints/
