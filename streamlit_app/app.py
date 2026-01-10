@@ -8,8 +8,16 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
 from pathlib import Path
 import warnings
+import gc
+
+torch.set_num_threads(1)
 
 warnings.filterwarnings("ignore", message=".*torch.classes.*")
+
+if "current_model_path" not in st.session_state:
+    st.session_state.current_model_path = None
+    st.session_state.tokenizer = None
+    st.session_state.model = None
 
 
 # os.environ["TRANSFORMERS_NO_TOKENIZERS"] = "1"
@@ -165,9 +173,9 @@ def preprocess_normal(text):
     s["Original"] = text
     text = text.lower()
     s["Lowercase"] = text
-    text = re.sub(r"http\\S+|www\\S+|@\\w+|#\\w+|\\d+", "", text)
+    text = re.sub(r"http\S+|www\S+|@\w+|#\w+|\d+", "", text)
     s["Cleaning"] = text
-    text = re.sub(r"\\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
     s["Normalize"] = text
     text = normalize_slang(text)
     s["Slang"] = text
@@ -185,14 +193,14 @@ def preprocess_light(text):
     s["Original"] = text
     text = text.lower()
     s["Lowercase"] = text
-    text = re.sub(r"http\\S+|www\\S+|@\\w+", "", text)
-    text = re.sub(r"#(\\w+)", r"\\1", text)
+    text = re.sub(r"http\S+|www\S+|@\w+", "", text)
+    text = re.sub(r"#(\w+)", r"\1", text)
     s["Clean"] = text
     text = reduce_repeat(text)
     s["Reduce Repeated Char"] = text
     text = normalize_slang(text)
     s["Slang"] = text
-    text = re.sub(r"\\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
     s["Normalize"] = text
     return text, s
 
@@ -217,8 +225,8 @@ label_colors = ["#1b5e20", "#f9a825", "#ef6c00", "#c62828"]
 
 # =====================================================================
 # LOAD MODEL
-# =====================================================================
-@st.cache_resource
+# =====================================================================s
+@st.cache_resource(show_spinner="Loading model...")
 def load_model(path):
     tok = AutoTokenizer.from_pretrained(path, use_fast=False)
     model = AutoModelForSequenceClassification.from_pretrained(path)
@@ -235,7 +243,7 @@ def predict(txt, tok, model):
 
 
 # =====================================================================
-# UI LAYOUT — STACKED (VERTICAL) LIKE NAVY VERSION
+# UI LAYOUT
 # =====================================================================
 
 st.title("🔍 Deteksi Tingkat Depresi dari Teks")
@@ -263,17 +271,31 @@ prep = st.radio(
 # Input
 user_text = st.text_area("Masukkan teks:", height=180)
 
+selected_model_path, preprocess_fn = MODEL_PATHS[arch][prep]
+
+if st.session_state.current_model_path != selected_model_path:
+    # st.cache_resource.clear()
+    st.session_state.tokenizer = None
+    st.session_state.model = None
+    gc.collect()
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+    tok, model = load_model(selected_model_path)
+    st.session_state.tokenizer = tok
+    st.session_state.model = model
+    st.session_state.current_model_path = selected_model_path
+
 # Run button
 if st.button("Analisis"):
     if not user_text.strip():
         st.warning("Masukkan teks terlebih dahulu.")
     else:
-        path, fn = MODEL_PATHS[arch][prep]
-        tok, model = load_model(path)
-        processed, steps = fn(user_text)
+        tok = st.session_state.tokenizer
+        model = st.session_state.model
+
+        processed, steps = preprocess_fn(user_text)
         pred, probs = predict(processed, tok, model)
 
-        # Output badge
         st.markdown(
             f"<div class='result-pill' style='background:{label_colors[pred]}'>{label_map[pred]}</div>",
             unsafe_allow_html=True,
@@ -288,5 +310,4 @@ if st.button("Analisis"):
                 f"<div class='pre-box'><strong>{k}</strong><br>{v}</div>",
                 unsafe_allow_html=True,
             )
-
         st.caption("Catatan: Ini adalah alat skrining, bukan alat diagnosis klinis.")
