@@ -121,7 +121,7 @@ textarea, input {
 # SLANG LOAD
 # =====================================================================
 BASE_DIR = Path(__file__).parent
-SLANG_PATH = BASE_DIR / "tweet" / "slang.csv"
+SLANG_PATH = BASE_DIR / "tweet" / "000_colloquial-indonesian-lexicon.csv"
 
 
 @st.cache_resource
