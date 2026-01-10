@@ -76,7 +76,6 @@ textarea {
 # ===============================
 # TITLE
 # ===============================
-st.title("🔍 Deteksi Tingkat Depresi dari Teks")
 st.write(
     "Perbandingan **IndoBERT** dan **XLM-RoBERTa** dengan preprocessing **Normal** dan **Light**."
 )
