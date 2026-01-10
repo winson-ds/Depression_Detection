@@ -7,8 +7,12 @@ import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
 from pathlib import Path
+import warnings
 
-os.environ["TRANSFORMERS_NO_TOKENIZERS"] = "1"
+warnings.filterwarnings("ignore", message=".*torch.classes.*")
+
+
+# os.environ["TRANSFORMERS_NO_TOKENIZERS"] = "1"
 
 st.set_page_config(page_title="Deteksi Depresi", layout="centered")
 st.markdown(
