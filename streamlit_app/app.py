@@ -8,9 +8,6 @@ from pathlib import Path
 import nltk
 from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
-import gc
-from transformers import XLMRobertaForSequenceClassification
-
 
 torch.set_num_threads(1)
 
@@ -21,7 +18,7 @@ st.set_page_config(page_title="Deteksi Depresi", layout="centered")
 st.title("🔍 Deteksi Tingkat Depresi")
 
 # ===============================
-# STYLE (CSS)
+# STYLE (CSS) — TIDAK DIUBAH
 # ===============================
 st.markdown(
     """
@@ -74,7 +71,7 @@ textarea {
 )
 
 # ===============================
-# TITLE
+# DESC
 # ===============================
 st.write(
     "Perbandingan **IndoBERT** dan **XLM-RoBERTa** dengan preprocessing **Normal** dan **Light**."
@@ -105,7 +102,7 @@ def reduce_repeat(t):
 
 
 # ===============================
-# NLP SETUP
+# NLP
 # ===============================
 nltk.download("stopwords", quiet=True)
 stop_id = set(stopwords.words("indonesian"))
@@ -156,20 +153,26 @@ user_text = st.text_area("Masukkan teks", height=160)
 
 
 # ===============================
-# MODEL
+# 🔥 TOKENIZER XLM-R GLOBAL (KUNCI FIX)
 # ===============================
 @st.cache_resource
-def load_model(model_path):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_path,
-        use_fast=False,
-        trust_remote_code=False,
-    )
+def load_xlmr_tokenizer():
+    return AutoTokenizer.from_pretrained("xlm-roberta-base", use_fast=False)
+
+
+XLMR_TOKENIZER = load_xlmr_tokenizer()
+
+
+# ===============================
+# MODEL LOADER (MODEL SAJA)
+# ===============================
+@st.cache_resource
+def load_model_only(model_path):
     model = AutoModelForSequenceClassification.from_pretrained(
         model_path, torch_dtype=torch.float32
     )
     model.eval()
-    return tokenizer, model
+    return model
 
 
 # ===============================
@@ -181,13 +184,18 @@ if st.button("Analisis"):
         st.stop()
 
     model_path, preprocess_fn = MODEL_PATHS[arch][prep]
-
-    tok, model = load_model(model_path)
-
     processed = preprocess_fn(user_text)
 
+    # 🔑 PILIH TOKENIZER DENGAN BENAR
+    if arch == "XLM-RoBERTa":
+        tokenizer = XLMR_TOKENIZER
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+
+    model = load_model_only(model_path)
+
     with torch.no_grad():
-        enc = tok(processed, return_tensors="pt", truncation=True, max_length=256)
+        enc = tokenizer(processed, return_tensors="pt", truncation=True, max_length=256)
         probs = torch.softmax(model(**enc).logits, dim=1)[0].cpu().numpy()
         pred = int(np.argmax(probs))
 
