@@ -160,8 +160,14 @@ user_text = st.text_area("Masukkan teks", height=160)
 # ===============================
 @st.cache_resource
 def load_model(model_path):
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path,
+        use_fast=False,
+        trust_remote_code=False,
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_path, torch_dtype=torch.float32
+    )
     model.eval()
     return tokenizer, model
 
