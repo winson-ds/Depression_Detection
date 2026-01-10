@@ -220,7 +220,7 @@ label_colors = ["#1b5e20", "#f9a825", "#ef6c00", "#c62828"]
 # =====================================================================
 @st.cache_resource
 def load_model(path):
-    tok = AutoTokenizer.from_pretrained(path)
+    tok = AutoTokenizer.from_pretrained(path, use_fast=False)
     model = AutoModelForSequenceClassification.from_pretrained(path)
     model.eval()
     return tok, model
