@@ -1,7 +1,3 @@
-# ===============================
-# app.py — FINAL STABLE VERSION
-# ===============================
-
 import streamlit as st
 import torch
 import re
@@ -12,13 +8,15 @@ from pathlib import Path
 import nltk
 from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+import gc
 
 torch.set_num_threads(1)
 
 # ===============================
-# PAGE CONFIG (WAJIB PALING ATAS)
+# PAGE
 # ===============================
-st.set_page_config(page_title="Deteksi Tingkat Depresi", layout="centered")
+st.set_page_config(page_title="Deteksi Depresi", layout="centered")
+st.title("🔍 Deteksi Tingkat Depresi")
 
 # ===============================
 # STYLE (CSS)
@@ -114,27 +112,21 @@ stemmer = StemmerFactory().create_stemmer()
 
 
 def preprocess_normal(text):
-    steps = {}
-    steps["Original"] = text
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|@\w+|#\w+|\d+", "", text)
     text = normalize_slang(text)
     text = reduce_repeat(text)
     text = " ".join(w for w in text.split() if w not in stop_id)
     text = " ".join(stemmer.stem(w) for w in text.split())
-    steps["Final"] = text
-    return text, steps
+    return text
 
 
 def preprocess_light(text):
-    steps = {}
-    steps["Original"] = text
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|@\w+", "", text)
     text = normalize_slang(text)
     text = reduce_repeat(text)
-    steps["Final"] = text
-    return text, steps
+    return text
 
 
 # ===============================
@@ -162,26 +154,40 @@ prep = st.radio("Preprocessing", ["Normal", "Light"], horizontal=True)
 user_text = st.text_area("Masukkan teks", height=160)
 
 # ===============================
-# MODEL CACHE (MANUAL & AMAN)
+# MODEL
 # ===============================
-if "model_store" not in st.session_state:
-    st.session_state.model_store = {}
+if "active_model_key" not in st.session_state:
+    st.session_state.active_model_key = None
+    st.session_state.tokenizer = None
+    st.session_state.model = None
 
 
-def load_model_once(path, arch):
-    if path not in st.session_state:
+def load_model_safely(model_key, model_path, arch):
+    # 🔥 XLM-R: WAJIB unload jika ganti model
+    if arch == "XLM-RoBERTa" and st.session_state.active_model_key != model_key:
+        st.session_state.tokenizer = None
+        st.session_state.model = None
+        gc.collect()
+
+    if st.session_state.active_model_key != model_key:
         with st.spinner("Memuat model..."):
             if arch == "XLM-RoBERTa":
-                tok = AutoTokenizer.from_pretrained("xlm-roberta-base", use_fast=False)
+                tokenizer = AutoTokenizer.from_pretrained(
+                    "xlm-roberta-base", use_fast=False
+                )
             else:
-                tok = AutoTokenizer.from_pretrained(path, use_fast=False)
+                tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
 
             model = AutoModelForSequenceClassification.from_pretrained(
-                path, torch_dtype=torch.float32
+                model_path, torch_dtype=torch.float32, low_cpu_mem_usage=True
             )
             model.eval()
-            st.session_state[path] = (tok, model)
-    return st.session_state[path]
+
+            st.session_state.tokenizer = tokenizer
+            st.session_state.model = model
+            st.session_state.active_model_key = model_key
+
+    return st.session_state.tokenizer, st.session_state.model
 
 
 # ===============================
@@ -190,28 +196,31 @@ def load_model_once(path, arch):
 if st.button("Analisis"):
     if not user_text.strip():
         st.warning("Masukkan teks terlebih dahulu.")
-    else:
-        model_path, preprocess_fn = MODEL_PATHS[arch][prep]
-        tok, model = load_model_once(model_path, arch)
+        st.stop()
 
-        processed, steps = preprocess_fn(user_text)
+    # ambil config model
+    model_path, preprocess_fn = MODEL_PATHS[arch][prep]
 
-        with torch.no_grad():
-            enc = tok(processed, return_tensors="pt", truncation=True, max_length=256)
-            probs = torch.softmax(model(**enc).logits, dim=1)[0].numpy()
-            pred = int(np.argmax(probs))
+    # 🔑 key UNIK (INI KRUSIAL)
+    model_key = f"{arch}_{prep}"
 
-        st.markdown(
-            f"<div style='background:{COLORS[pred]};padding:12px;border-radius:12px;"
-            f"color:white;font-weight:700'>{LABELS[pred]}</div>",
-            unsafe_allow_html=True,
-        )
+    tok, model = load_model_safely(
+        model_key=model_key, model_path=model_path, arch=arch
+    )
 
-        st.subheader("Confidence Score")
-        st.write(float(probs[pred]))
+    processed = preprocess_fn(user_text)
 
-        st.subheader("Preprocessing")
-        for k, v in steps.items():
-            st.code(f"{k}: {v}")
+    with torch.no_grad():
+        enc = tok(processed, return_tensors="pt", truncation=True, max_length=256)
+        probs = torch.softmax(model(**enc).logits, dim=1)[0].numpy()
+        pred = int(np.argmax(probs))
 
-        st.caption("⚠️ Alat skrining, bukan diagnosis klinis.")
+    st.markdown(
+        f"<div style='background:{COLORS[pred]};"
+        f"padding:12px;border-radius:12px;"
+        f"color:white;font-weight:700'>"
+        f"{LABELS[pred]}</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.write("Confidence:", float(probs[pred]))
