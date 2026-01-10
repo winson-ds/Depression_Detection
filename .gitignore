@@ -6,3 +6,4 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 __pycache__/
+streamlit_app/lama.py/
