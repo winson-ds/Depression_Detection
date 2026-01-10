@@ -144,11 +144,11 @@ MODEL_PATHS = {
     "IndoBERT": {
         "Normal": ("winsonn13/indobert-normal", preprocess_normal),
         "Light": ("winsonn13/indobert-light", preprocess_light),
-    },
-    "XLM-RoBERTa": {
-        "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
-        "Light": ("winsonn13/xlmroberta-light", preprocess_light),
-    },
+    }  # ,
+    # "XLM-RoBERTa": {
+    #     "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
+    #     "Light": ("winsonn13/xlmroberta-light", preprocess_light),
+    # },
 }
 
 LABELS = ["Tidak Depresi", "Depresi Ringan", "Depresi Sedang", "Depresi Berat"]
@@ -169,15 +169,15 @@ if "model_store" not in st.session_state:
 
 
 def load_model_once(path):
-    if path not in st.session_state.model_store:
+    if path not in st.session_state:
         with st.spinner("Memuat model..."):
             tok = AutoTokenizer.from_pretrained(path, use_fast=False)
             model = AutoModelForSequenceClassification.from_pretrained(
-                path, low_cpu_mem_usage=True
+                path, torch_dtype=torch.float32
             )
             model.eval()
-            st.session_state.model_store[path] = (tok, model)
-    return st.session_state.model_store[path]
+            st.session_state[path] = (tok, model)
+    return st.session_state[path]
 
 
 # ===============================
