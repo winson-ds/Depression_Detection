@@ -155,39 +155,16 @@ arch = st.radio("Model", ["IndoBERT", "XLM-RoBERTa"], horizontal=True)
 prep = st.radio("Preprocessing", ["Normal", "Light"], horizontal=True)
 user_text = st.text_area("Masukkan teks", height=160)
 
+
 # ===============================
 # MODEL
 # ===============================
-if "active_model_key" not in st.session_state:
-    st.session_state.active_model_key = None
-    st.session_state.tokenizer = None
-    st.session_state.model = None
-
-
-def load_model_safely(model_key, model_path, arch):
-    if st.session_state.active_model_key != model_key:
-        st.session_state.tokenizer = None
-        st.session_state.model = None
-        gc.collect()
-
-        with st.spinner("Memuat model..."):
-            if arch == "XLM-RoBERTa":
-                tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-                model = XLMRobertaForSequenceClassification.from_pretrained(
-                    model_path, torch_dtype=torch.float32
-                )
-            else:
-                tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-                model = AutoModelForSequenceClassification.from_pretrained(
-                    model_path, torch_dtype=torch.float32
-                )
-
-            model.eval()
-            st.session_state.tokenizer = tokenizer
-            st.session_state.model = model
-            st.session_state.active_model_key = model_key
-
-    return st.session_state.tokenizer, st.session_state.model
+@st.cache_resource
+def load_model(model_path):
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    model.eval()
+    return tokenizer, model
 
 
 # ===============================
@@ -198,21 +175,15 @@ if st.button("Analisis"):
         st.warning("Masukkan teks terlebih dahulu.")
         st.stop()
 
-    # ambil config model
     model_path, preprocess_fn = MODEL_PATHS[arch][prep]
 
-    # 🔑 key UNIK (INI KRUSIAL)
-    model_key = f"{arch}_{prep}"
-
-    tok, model = load_model_safely(
-        model_key=model_key, model_path=model_path, arch=arch
-    )
+    tok, model = load_model(model_path)
 
     processed = preprocess_fn(user_text)
 
     with torch.no_grad():
         enc = tok(processed, return_tensors="pt", truncation=True, max_length=256)
-        probs = torch.softmax(model(**enc).logits, dim=1)[0].numpy()
+        probs = torch.softmax(model(**enc).logits, dim=1)[0].cpu().numpy()
         pred = int(np.argmax(probs))
 
     st.markdown(
