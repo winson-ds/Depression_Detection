@@ -144,11 +144,11 @@ MODEL_PATHS = {
     "IndoBERT": {
         "Normal": ("winsonn13/indobert-normal", preprocess_normal),
         "Light": ("winsonn13/indobert-light", preprocess_light),
-    }  # ,
-    # "XLM-RoBERTa": {
-    #     "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
-    #     "Light": ("winsonn13/xlmroberta-light", preprocess_light),
-    # },
+    },
+    "XLM-RoBERTa": {
+        "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
+        "Light": ("winsonn13/xlmroberta-light", preprocess_light),
+    },
 }
 
 LABELS = ["Tidak Depresi", "Depresi Ringan", "Depresi Sedang", "Depresi Berat"]
