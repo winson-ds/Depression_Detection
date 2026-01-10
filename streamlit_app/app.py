@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
+from pathlib import Path
 
 os.environ["TRANSFORMERS_NO_TOKENIZERS"] = "1"
 
@@ -119,7 +120,8 @@ textarea, input {
 # =====================================================================
 # SLANG LOAD
 # =====================================================================
-SLANG_PATH = "tweet/000_colloquial-indonesian-lexicon.csv"
+BASE_DIR = Path(__file__).parent
+SLANG_PATH = BASE_DIR / "data" / "slang.csv"
 
 
 @st.cache_resource
