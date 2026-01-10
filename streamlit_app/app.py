@@ -138,7 +138,7 @@ def normalize_slang(t):
 
 
 def reduce_repeat(t):
-    return re.sub(r"(.)\\1{2,}", r"\\1", t)
+    return re.sub(r"(.)\1{2,}", r"\1", t)
 
 
 # =====================================================================
@@ -242,11 +242,19 @@ st.write(
 # Radio (vertical stacked, NOT side-by-side)
 st.markdown("### Arsitektur Model")
 arch = st.radio(
-    "", ["IndoBERT", "XLM-RoBERTa"], horizontal=True, label_visibility="collapsed"
+    "Model Architecture",
+    ["IndoBERT", "XLM-RoBERTa"],
+    horizontal=True,
+    label_visibility="collapsed",
 )
 
 st.markdown("### Tipe Preprocessing")
-prep = st.radio("", ["Normal", "Light"], horizontal=True, label_visibility="collapsed")
+prep = st.radio(
+    "Preprocessing Type",
+    ["Normal", "Light"],
+    horizontal=True,
+    label_visibility="collapsed",
+)
 
 # Input
 user_text = st.text_area("Masukkan teks:", height=180)
