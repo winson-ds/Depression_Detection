@@ -168,10 +168,14 @@ if "model_store" not in st.session_state:
     st.session_state.model_store = {}
 
 
-def load_model_once(path):
+def load_model_once(path, arch):
     if path not in st.session_state:
         with st.spinner("Memuat model..."):
-            tok = AutoTokenizer.from_pretrained(path, use_fast=False)
+            if arch == "XLM-RoBERTa":
+                tok = AutoTokenizer.from_pretrained("xlm-roberta-base", use_fast=False)
+            else:
+                tok = AutoTokenizer.from_pretrained(path, use_fast=False)
+
             model = AutoModelForSequenceClassification.from_pretrained(
                 path, torch_dtype=torch.float32
             )
@@ -188,7 +192,7 @@ if st.button("Analisis"):
         st.warning("Masukkan teks terlebih dahulu.")
     else:
         model_path, preprocess_fn = MODEL_PATHS[arch][prep]
-        tok, model = load_model_once(model_path)
+        tok, model = load_model_once(model_path, arch)
 
         processed, steps = preprocess_fn(user_text)
 
