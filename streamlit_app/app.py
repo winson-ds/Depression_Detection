@@ -3,7 +3,13 @@ import torch
 import re
 import pandas as pd
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+# from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import (
+    AutoModelForSequenceClassification,
+    BertTokenizer,
+    XLMRobertaTokenizer,
+)
 from pathlib import Path
 import nltk
 from nltk.corpus import stopwords
@@ -152,27 +158,18 @@ prep = st.radio("Preprocessing", ["Normal", "Light"], horizontal=True)
 user_text = st.text_area("Masukkan teks", height=160)
 
 
-# ===============================
-# 🔥 TOKENIZER XLM-R GLOBAL (KUNCI FIX)
-# ===============================
 @st.cache_resource
-def load_xlmr_tokenizer():
-    return AutoTokenizer.from_pretrained("xlm-roberta-base", use_fast=False)
+def load_model(model_path, arch):
+    if arch == "XLM-RoBERTa":
+        tokenizer = XLMRobertaTokenizer.from_pretrained(model_path, use_fast=False)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(model_path, use_fast=False)
 
-
-XLMR_TOKENIZER = load_xlmr_tokenizer()
-
-
-# ===============================
-# MODEL LOADER (MODEL SAJA)
-# ===============================
-@st.cache_resource
-def load_model_only(model_path):
     model = AutoModelForSequenceClassification.from_pretrained(
         model_path, torch_dtype=torch.float32
     )
     model.eval()
-    return model
+    return tokenizer, model
 
 
 # ===============================
@@ -186,13 +183,8 @@ if st.button("Analisis"):
     model_path, preprocess_fn = MODEL_PATHS[arch][prep]
     processed = preprocess_fn(user_text)
 
-    # 🔑 PILIH TOKENIZER DENGAN BENAR
-    if arch == "XLM-RoBERTa":
-        tokenizer = XLMR_TOKENIZER
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-
-    model = load_model_only(model_path)
+    # ✅ LOAD TOKENIZER + MODEL DARI SATU SUMBER
+    tokenizer, model = load_model(model_path, arch)
 
     with torch.no_grad():
         enc = tokenizer(processed, return_tensors="pt", truncation=True, max_length=256)
