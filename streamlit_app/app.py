@@ -1,5 +1,5 @@
 # ===============================
-# app.py — STREAMLIT CLOUD STABLE
+# app.py — FINAL STABLE VERSION
 # ===============================
 
 import streamlit as st
@@ -16,24 +16,57 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 torch.set_num_threads(1)
 
 # ===============================
-# PAGE CONFIG (HARUS PALING ATAS)
+# PAGE CONFIG (WAJIB PALING ATAS)
 # ===============================
 st.set_page_config(page_title="Deteksi Tingkat Depresi", layout="centered")
 
 # ===============================
-# STYLE
+# STYLE (CSS)
 # ===============================
 st.markdown(
     """
 <style>
 body, .stApp {
-    background-color: #0f1115;
-    color: #E6E6E6;
-    font-family: Inter, sans-serif;
+    background-color: #0f1115 !important;
+    color: #E6E6E6 !important;
+    font-family: Inter, sans-serif !important;
 }
+
+h1, h2, h3 {
+    font-weight: 700 !important;
+    color: #E6E6E6 !important;
+}
+
+.stRadio > div[role="radiogroup"] {
+    display: flex !important;
+    gap: 10px !important;
+}
+
+.stRadio > div[role="radiogroup"] > label {
+    padding: 10px 22px !important;
+    border-radius: 40px !important;
+    background: #1c1f24 !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #dfe7fd !important;
+    font-weight: 600 !important;
+}
+
+.stRadio > div[role="radiogroup"] > label:has(input:checked) {
+    background:#4c4fed !important;
+    color:white !important;
+}
+
 textarea {
-    background:#1c1f24;
-    color:#E6E6E6;
+    background:#1c1f24 !important;
+    color:#E6E6E6 !important;
+    border-radius:10px !important;
+}
+
+.stButton > button {
+    background:#1c1f24 !important;
+    color:#E6E6E6 !important;
+    border-radius:10px !important;
+    font-weight:600 !important;
 }
 </style>
 """,
@@ -44,7 +77,9 @@ textarea {
 # TITLE
 # ===============================
 st.title("🔍 Deteksi Tingkat Depresi dari Teks")
-st.write("Perbandingan IndoBERT dan XLM-RoBERTa dengan preprocessing Normal & Light.")
+st.write(
+    "Perbandingan **IndoBERT** dan **XLM-RoBERTa** dengan preprocessing **Normal** dan **Light**."
+)
 
 # ===============================
 # SLANG
@@ -71,7 +106,7 @@ def reduce_repeat(t):
 
 
 # ===============================
-# NLP
+# NLP SETUP
 # ===============================
 nltk.download("stopwords", quiet=True)
 stop_id = set(stopwords.words("indonesian"))
@@ -79,7 +114,8 @@ stemmer = StemmerFactory().create_stemmer()
 
 
 def preprocess_normal(text):
-    steps = {"Original": text}
+    steps = {}
+    steps["Original"] = text
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|@\w+|#\w+|\d+", "", text)
     text = normalize_slang(text)
@@ -91,7 +127,8 @@ def preprocess_normal(text):
 
 
 def preprocess_light(text):
-    steps = {"Original": text}
+    steps = {}
+    steps["Original"] = text
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|@\w+", "", text)
     text = normalize_slang(text)
@@ -103,26 +140,14 @@ def preprocess_light(text):
 # ===============================
 # MODEL CONFIG
 # ===============================
-MODEL_CONFIG = {
-    "IndoBERT Normal": {
-        "path": "winsonn13/indobert-normal",
-        "preprocess": preprocess_normal,
-        "arch": "indobert",
+MODEL_PATHS = {
+    "IndoBERT": {
+        "Normal": ("winsonn13/indobert-normal", preprocess_normal),
+        "Light": ("winsonn13/indobert-light", preprocess_light),
     },
-    "IndoBERT Light": {
-        "path": "winsonn13/indobert-light",
-        "preprocess": preprocess_light,
-        "arch": "indobert",
-    },
-    "XLM-R Normal": {
-        "path": "winsonn13/xlmroberta-normal",
-        "preprocess": preprocess_normal,
-        "arch": "xlmr",
-    },
-    "XLM-R Light": {
-        "path": "winsonn13/xlmroberta-light",
-        "preprocess": preprocess_light,
-        "arch": "xlmr",
+    "XLM-RoBERTa": {
+        "Normal": ("winsonn13/xlmroberta-normal", preprocess_normal),
+        "Light": ("winsonn13/xlmroberta-light", preprocess_light),
     },
 }
 
@@ -130,39 +155,33 @@ LABELS = ["Tidak Depresi", "Depresi Ringan", "Depresi Sedang", "Depresi Berat"]
 COLORS = ["#1b5e20", "#f9a825", "#ef6c00", "#c62828"]
 
 # ===============================
-# UI
+# UI INPUT
 # ===============================
-model_choice = st.radio("Model", list(MODEL_CONFIG.keys()))
+arch = st.radio("Model", ["IndoBERT", "XLM-RoBERTa"], horizontal=True)
+prep = st.radio("Preprocessing", ["Normal", "Light"], horizontal=True)
 user_text = st.text_area("Masukkan teks", height=160)
 
 # ===============================
-# MODEL STORE (AMAN)
+# MODEL CACHE (MANUAL & AMAN)
 # ===============================
-if "models" not in st.session_state:
-    st.session_state.models = {}
+if "model_store" not in st.session_state:
+    st.session_state.model_store = {}
 
 
-def load_model(model_key):
-    if model_key not in st.session_state.models:
-        cfg = MODEL_CONFIG[model_key]
+def load_model_once(path, arch):
+    if path not in st.session_state:
         with st.spinner("Memuat model..."):
-            if cfg["arch"] == "xlmr":
-                tokenizer = AutoTokenizer.from_pretrained(
-                    "xlm-roberta-base", use_fast=False
-                )
+            if arch == "XLM-RoBERTa":
+                tok = AutoTokenizer.from_pretrained("xlm-roberta-base", use_fast=False)
             else:
-                tokenizer = AutoTokenizer.from_pretrained(cfg["path"], use_fast=False)
+                tok = AutoTokenizer.from_pretrained(path, use_fast=False)
 
             model = AutoModelForSequenceClassification.from_pretrained(
-                cfg["path"],
-                torch_dtype=torch.float32,
-                low_cpu_mem_usage=True,
+                path, torch_dtype=torch.float32
             )
             model.eval()
-
-            st.session_state.models[model_key] = (tokenizer, model)
-
-    return st.session_state.models[model_key]
+            st.session_state[path] = (tok, model)
+    return st.session_state[path]
 
 
 # ===============================
@@ -171,29 +190,28 @@ def load_model(model_key):
 if st.button("Analisis"):
     if not user_text.strip():
         st.warning("Masukkan teks terlebih dahulu.")
-        st.stop()
+    else:
+        model_path, preprocess_fn = MODEL_PATHS[arch][prep]
+        tok, model = load_model_once(model_path, arch)
 
-    cfg = MODEL_CONFIG[model_choice]
-    tokenizer, model = load_model(model_choice)
+        processed, steps = preprocess_fn(user_text)
 
-    processed, steps = cfg["preprocess"](user_text)
+        with torch.no_grad():
+            enc = tok(processed, return_tensors="pt", truncation=True, max_length=256)
+            probs = torch.softmax(model(**enc).logits, dim=1)[0].numpy()
+            pred = int(np.argmax(probs))
 
-    with torch.no_grad():
-        enc = tokenizer(processed, return_tensors="pt", truncation=True, max_length=256)
-        probs = torch.softmax(model(**enc).logits, dim=1)[0].numpy()
-        pred = int(np.argmax(probs))
+        st.markdown(
+            f"<div style='background:{COLORS[pred]};padding:12px;border-radius:12px;"
+            f"color:white;font-weight:700'>{LABELS[pred]}</div>",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(
-        f"<div style='background:{COLORS[pred]};padding:12px;border-radius:12px;"
-        f"color:white;font-weight:700'>{LABELS[pred]}</div>",
-        unsafe_allow_html=True,
-    )
+        st.subheader("Confidence Score")
+        st.write(float(probs[pred]))
 
-    st.subheader("Confidence")
-    st.write(float(probs[pred]))
+        st.subheader("Preprocessing")
+        for k, v in steps.items():
+            st.code(f"{k}: {v}")
 
-    st.subheader("Preprocessing")
-    for k, v in steps.items():
-        st.code(f"{k}: {v}")
-
-    st.caption("⚠️ Alat skrining, bukan diagnosis klinis.")
+        st.caption("⚠️ Alat skrining, bukan diagnosis klinis.")
