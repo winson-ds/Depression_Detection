@@ -1,5 +1,0 @@
-[server]
-enableCORS = false
-
-[env]
-TRANSFORMERS_NO_TOKENIZERS = "1"
