@@ -9,6 +9,8 @@ import nltk
 from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 import gc
+from transformers import XLMRobertaForSequenceClassification
+
 
 torch.set_num_threads(1)
 
@@ -163,26 +165,24 @@ if "active_model_key" not in st.session_state:
 
 
 def load_model_safely(model_key, model_path, arch):
-    # 🔥 XLM-R: WAJIB unload jika ganti model
-    if arch == "XLM-RoBERTa" and st.session_state.active_model_key != model_key:
+    if st.session_state.active_model_key != model_key:
         st.session_state.tokenizer = None
         st.session_state.model = None
         gc.collect()
 
-    if st.session_state.active_model_key != model_key:
         with st.spinner("Memuat model..."):
             if arch == "XLM-RoBERTa":
-                tokenizer = AutoTokenizer.from_pretrained(
-                    "xlm-roberta-base", use_fast=False
+                tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+                model = XLMRobertaForSequenceClassification.from_pretrained(
+                    model_path, torch_dtype=torch.float32
                 )
             else:
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    model_path, torch_dtype=torch.float32
+                )
 
-            model = AutoModelForSequenceClassification.from_pretrained(
-                model_path, torch_dtype=torch.float32, low_cpu_mem_usage=True
-            )
             model.eval()
-
             st.session_state.tokenizer = tokenizer
             st.session_state.model = model
             st.session_state.active_model_key = model_key
